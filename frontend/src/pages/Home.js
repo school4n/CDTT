@@ -228,7 +228,7 @@ function Home() {
     const [hoveredCard, setHoveredCard] = useState(null);
     const [searchExecuted, setSearchExecuted] = useState(false); 
 
-    const API_URL = "http://localhost:3001/api/rooms";
+    const API_URL = "https://my-backend-mocha-phi.vercel.app/api/rooms";
 
     // Hàm chọn N phòng ngẫu nhiên
     const selectRandomRooms = (data, count = 3) => {
