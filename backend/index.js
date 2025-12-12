@@ -1569,4 +1569,7 @@ app.delete("/api/reviews/:id", verifyToken, (req, res) => {
    START SERVER
 ========================== */
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Server chạy tại http://localhost:${PORT}`));
+
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
