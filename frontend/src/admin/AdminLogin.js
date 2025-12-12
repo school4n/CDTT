@@ -92,7 +92,7 @@ function AdminLogin() {
     const [loginError, setLoginError] = useState(null);
     const navigate = useNavigate();
 
-    const API_ADMIN_LOGIN = "http://localhost:3001/api/admin/auth/login";
+    const API_ADMIN_LOGIN = "https://my-backend-mocha-phi.vercel.app/api/admin/auth/login";
 
     const handleChange = (e) => {
         setCredentials({ ...credentials, [e.target.name]: e.target.value });
