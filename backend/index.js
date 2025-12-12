@@ -12,17 +12,23 @@ app.use(express.json());
 // Cấu hình CSDL
 // ==========================
 const db = mysql.createConnection({
-    host: "localhost",
-    user: "root",
-    password: "",
-    database: "khachsan",
+    host: process.env.DB_HOST || 'khachsan-jamisan999.l.aivencloud.com',
+    port: process.env.DB_PORT || 22832,
+    user: process.env.DB_USER || 'avnadmin',
+    password: process.env.DB_PASS, // Mật khẩu sẽ cài đặt trên Render để bảo mật
+    database: process.env.DB_NAME || 'defaultdb',
+    ssl: {
+        rejectUnauthorized: false
+    }
 });
+
+// Thêm đoạn này để kiểm tra xem kết nối được không
 db.connect((err) => {
     if (err) {
-        console.error("❌ Lỗi kết nối MySQL:", err);
-        process.exit(1);
+        console.error('Lỗi kết nối Database:', err);
+        return;
     }
-    console.log("✅ Kết nối MySQL thành công với cấu trúc CSDL đầy đủ.");
+    console.log('Đã kết nối thành công đến Aiven MySQL!');
 });
 
 // ==========================
