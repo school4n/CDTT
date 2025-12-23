@@ -10,26 +10,26 @@ app.use(cors());
 app.use(express.json());
 
 // ==========================
-// Cấu hình CSDL
+// Cấu hình CSDL TiDB Cloud
 // ==========================
 const db = mysql.createConnection({
-    host: process.env.DB_HOST || 'khachsan-jamisan999.l.aivencloud.com',
-    port: process.env.DB_PORT || 22832,
-    user: process.env.DB_USER || 'avnadmin',
-    password: process.env.DB_PASS, // Mật khẩu sẽ cài đặt trên Render để bảo mật
-    database: process.env.DB_NAME || 'defaultdb',
+    host: process.env.DB_HOST || 'gateway01.ap-southeast-1.prod.aws.tidbcloud.com', // Lấy từ HOST
+    port: process.env.DB_PORT || 4000,                                             // Lấy từ PORT
+    user: process.env.DB_USER || '3qhZS3hkjF2gDVy.root',                           // Lấy từ USERNAME
+    password: process.env.DB_PASS || 'ZVPPWHnjwITbQw1P',                      // Mật khẩu khi nhấn Generate
+    database: process.env.DB_NAME || 'khachsan',                                   // Lấy từ DATABASE
     ssl: {
-        rejectUnauthorized: false
+        minVersion: 'TLSv1.2',
+        rejectUnauthorized: true // TiDB Cloud yêu cầu SSL an toàn
     }
 });
 
-// Thêm đoạn này để kiểm tra xem kết nối được không
 db.connect((err) => {
     if (err) {
-        console.error('Lỗi kết nối Database:', err);
+        console.error('Lỗi kết nối TiDB Cloud:', err);
         return;
     }
-    console.log('Đã kết nối thành công đến Aiven MySQL!');
+    console.log('Đã kết nối thành công đến TiDB Cloud (khachsan)!');
 });
 
 // ==========================
