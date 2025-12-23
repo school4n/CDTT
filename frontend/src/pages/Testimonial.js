@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 
 // 🎨 Dữ liệu testimonial
 const testimonials = [
@@ -28,97 +28,102 @@ const DARK_BG = "#0f172a";
 const TEXT_COLOR = "#333";
 const SECONDARY_TEXT = "#6c757d";
 
-const styles = {
-  section: {
-    padding: '80px 0',
-    backgroundColor: '#f9f9ff',
-    fontFamily: 'serif',
-  },
-  container: {
-    maxWidth: '1170px',
-    margin: '0 auto',
-    padding: '0 15px',
-  },
-  titleContainer: {
-    textAlign: 'center',
-    marginBottom: '50px',
-  },
-  heading: {
-    fontSize: '2rem',
-    fontWeight: 'bold',
-    color: DARK_BG,
-    marginBottom: '10px',
-  },
-  subtext: {
-    fontSize: '1rem',
-    color: SECONDARY_TEXT,
-  },
-  slider: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    gap: '30px',
-    flexWrap: 'wrap', // Cho responsive xuống dòng trên mobile
-  },
-  itemCard: {
-    flex: '1 1 30%', // Mỗi testimonial chiếm ~1/3
-    padding: '10px',
-    backgroundColor: '#fff',
-    borderRadius: '8px',
-    boxShadow: '0 5px 15px rgba(0,0,0,0.05)',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    textAlign: 'center',
-    minHeight: '250px',
-    boxSizing: 'border-box',
-  },
-  image: {
-    width: '80px',
-    height: '80px',
-    borderRadius: '50%',
-    objectFit: 'cover',
-    marginBottom: '15px',
-    border: `3px solid ${ROYAL_COLOR}`,
-  },
-  text: {
-    fontSize: '0.95rem',
-    lineHeight: 1.6,
-    color: TEXT_COLOR,
-    marginBottom: '15px',
-  },
-  name: {
-    fontSize: '1.1rem',
-    fontWeight: 'bold',
-    color: DARK_BG,
-    textDecoration: 'none',
-    marginBottom: '5px',
-  },
-  star: {
-    color: ROYAL_COLOR,
-    fontSize: '1.1rem',
-  }
-};
-
-// 🎨 Hàm hiển thị số sao (Unicode/Emoji)
 const renderStars = (rating) => {
   const fullStars = Math.floor(rating);
   const halfStar = rating % 1 >= 0.5;
   const stars = [];
-
-  for (let i = 0; i < fullStars; i++) {
-    stars.push(<span key={i} style={{marginRight: '3px'}}>★</span>);
-  }
-  if (halfStar) {
-    stars.push(<span key="half" style={{marginRight: '3px'}}>★</span>);
-  }
+  for (let i = 0; i < fullStars; i++) stars.push(<span key={i} style={{marginRight: '3px'}}>★</span>);
+  if (halfStar) stars.push(<span key="half" style={{marginRight: '3px'}}>★</span>);
   const emptyStars = 5 - stars.length;
-  for (let i = 0; i < emptyStars; i++) {
-    stars.push(<span key={`empty-${i}`} style={{marginRight: '3px', opacity: 0.5}}>☆</span>);
-  }
+  for (let i = 0; i < emptyStars; i++) stars.push(<span key={`empty-${i}`} style={{marginRight: '3px', opacity: 0.5}}>☆</span>);
   return stars;
 };
 
 const Testimonial = () => {
+  // 📱 1. THÊM STATE CHECK MOBILE
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+      const handleResize = () => setIsMobile(window.innerWidth < 768);
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // 🎨 STYLES (Đưa vào trong để dùng biến isMobile)
+  const styles = {
+    section: {
+      padding: isMobile ? '40px 0' : '80px 0', // Giảm padding trên mobile
+      backgroundColor: '#f9f9ff',
+      fontFamily: 'serif',
+    },
+    container: {
+      maxWidth: '1170px',
+      margin: '0 auto',
+      padding: '0 15px',
+    },
+    titleContainer: {
+      textAlign: 'center',
+      marginBottom: isMobile ? '30px' : '50px',
+    },
+    heading: {
+      fontSize: isMobile ? '1.8rem' : '2rem',
+      fontWeight: 'bold',
+      color: DARK_BG,
+      marginBottom: '10px',
+    },
+    subtext: {
+      fontSize: '1rem',
+      color: SECONDARY_TEXT,
+    },
+    slider: {
+      display: 'flex',
+      // 📱 Mobile: Xếp dọc (column), Desktop: Xếp ngang (row)
+      flexDirection: isMobile ? 'column' : 'row', 
+      justifyContent: 'space-between',
+      gap: '30px',
+    },
+    itemCard: {
+      // 📱 Mobile: Chiếm 100% chiều rộng, Desktop: Chiếm ~30%
+      width: isMobile ? '100%' : '30%',
+      flex: isMobile ? 'none' : '1 1 30%', 
+      padding: '20px', // Tăng padding nội bộ chút cho thoáng
+      backgroundColor: '#fff',
+      borderRadius: '8px',
+      boxShadow: '0 5px 15px rgba(0,0,0,0.05)',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      textAlign: 'center',
+      minHeight: '250px',
+      boxSizing: 'border-box',
+    },
+    image: {
+      width: '80px',
+      height: '80px',
+      borderRadius: '50%',
+      objectFit: 'cover',
+      marginBottom: '15px',
+      border: `3px solid ${ROYAL_COLOR}`,
+    },
+    text: {
+      fontSize: '0.95rem',
+      lineHeight: 1.6,
+      color: TEXT_COLOR,
+      marginBottom: '15px',
+    },
+    name: {
+      fontSize: '1.1rem',
+      fontWeight: 'bold',
+      color: DARK_BG,
+      textDecoration: 'none',
+      marginBottom: '5px',
+    },
+    star: {
+      color: ROYAL_COLOR,
+      fontSize: '1.1rem',
+    }
+  };
+
   return (
     <section style={styles.section} className="testimonial_area section_gap">
       <div style={styles.container}>
@@ -132,7 +137,7 @@ const Testimonial = () => {
             <div style={styles.itemCard} key={index} className="media testimonial_item">
               <img style={styles.image} src={item.img} alt={item.name} className="rounded-circle" />
               <div style={{width: '100%'}} className="media-body">
-                <p style={styles.text}>{item.text}</p>
+                <p style={styles.text}>"{item.text}"</p>
                 <h4 style={styles.name} className="sec_h4">{item.name}</h4>
                 <div style={styles.star} className="star">{renderStars(item.rating)}</div>
               </div>

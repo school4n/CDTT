@@ -4,6 +4,7 @@ const mysql = require("mysql");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -81,6 +82,9 @@ function verifyAdminToken(req, res, next) {
         });
     });
 }
+
+
+
 
 
 /* ==========================================================
@@ -245,57 +249,178 @@ app.post("/api/admin/auth/login", (req, res) => {
    II. ROOMS ENDPOINTS (CRUD PHÒNG)
 ========================================================== */
 
-// GET /api/rooms (Read All - Dành cho Frontend)
+// GET /api/rooms (Read All - Chỉ lấy phòng còn trống tại thời điểm hiện tại)
 app.get("/api/rooms", (req, res) => {
+    // Lấy ngày hiện tại định dạng YYYY-MM-DD
+    const today = new Date().toISOString().split('T')[0];
+
     const sql = `
         SELECT r.*, GROUP_CONCAT(rf.facility_id) AS facility_ids
         FROM rooms r
         LEFT JOIN room_facilities rf ON r.id = rf.room_id
+        
+        -- Kỹ thuật loại trừ phòng đang bận ngay hôm nay
+        LEFT JOIN (
+            SELECT DISTINCT b.room_id
+            FROM booking_order b
+            JOIN booking_details d ON b.id = d.booking_id
+            WHERE 
+                b.order_status IN ('confirmed', 'checked_in') 
+                AND (DATE(?) BETWEEN DATE(d.check_in_date) AND DATE_SUB(DATE(d.check_out_date), INTERVAL 1 DAY))
+        ) AS busy ON r.id = busy.room_id
+
+        WHERE 
+            r.status IN ('active', 'available') -- Chỉ lấy phòng đang hoạt động
+            AND busy.room_id IS NULL             -- Phòng KHÔNG nằm trong danh sách bận
+            
         GROUP BY r.id
         ORDER BY r.price_per_night ASC
     `;
-    db.query(sql, (err, rows) => {
+
+    db.query(sql, [today], (err, rows) => {
         if (err) return res.status(500).json({ message: "DB error", error: err });
         res.json(rows);
     });
 });
 
-// GET /api/rooms/:id (Read One - Chi tiết)
+// GET /api/rooms/search
+// Phiên bản "Siêu Cứng": Ép kiểu ngày tháng và in log chi tiết
+app.get("/api/rooms/search", (req, res) => {
+    const { checkIn, checkOut } = req.query;
+
+    if (!checkIn || !checkOut) {
+        return res.status(400).json({ message: "Vui lòng chọn ngày Check-in và Check-out" });
+    }
+
+    console.log(`\n🔍 --- DEBUG SEARCH ---`);
+    console.log(`📅 Khách tìm: ${checkIn} -> ${checkOut}`);
+
+    // LOGIC: Tìm ID các phòng đang bận, sau đó loại trừ ra.
+    // Sử dụng DATE() để cắt bỏ giờ phút giây, chỉ so sánh ngày.
+    
+    const sql = `
+        SELECT r.*, GROUP_CONCAT(rf.facility_id) AS facility_ids
+        FROM rooms r
+        LEFT JOIN room_facilities rf ON r.id = rf.room_id
+        
+        -- KỸ THUẬT ANTI-JOIN
+        LEFT JOIN (
+            SELECT DISTINCT b.room_id
+            FROM booking_order b
+            JOIN booking_details d ON b.id = d.booking_id
+            WHERE 
+                -- 1. CHẶN MỌI TRẠNG THÁI (Dùng TRIM và LOWER để tránh lỗi chính tả trong DB)
+                TRIM(LOWER(b.order_status)) IN ('confirmed', 'checked_in', 'paid', 'success', 'booked', 'pending', 'waiting') 
+            AND (
+                -- 2. SO SÁNH NGÀY (Ép kiểu DATE để chính xác tuyệt đối)
+                (DATE(d.check_in_date) < DATE(?) AND DATE(d.check_out_date) > DATE(?))
+            )
+        ) AS busy ON r.id = busy.room_id
+
+        WHERE 
+            r.status IN ('active', 'available', 'booked') 
+            AND busy.room_id IS NULL -- Chỉ lấy phòng KHÔNG nằm trong danh sách bận
+        
+        GROUP BY r.id
+        ORDER BY r.price_per_night ASC
+    `;
+
+    // In câu lệnh SQL ra để kiểm tra nếu cần (Optional)
+    // console.log("SQL Query:", sql); 
+
+    db.query(sql, [checkOut, checkIn], (err, rows) => {
+        if (err) {
+            console.error("❌ Lỗi Backend:", err);
+            return res.status(500).json({ message: "Lỗi Server", error: err });
+        }
+        
+        console.log(`✅ Kết quả: Tìm thấy ${rows.length} phòng trống.`);
+        // In danh sách ID phòng tìm được để bạn đối chiếu
+        const foundIds = rows.map(r => r.id);
+        console.log(`📋 Danh sách ID phòng hiển thị: [${foundIds.join(", ")}]`);
+
+        // Kiểm tra xem phòng bạn vừa đặt (ví dụ ID 47) có nằm trong này không
+        // Nếu có -> Lỗi. Nếu không -> Code chạy đúng.
+        
+        res.json({
+            message: "Thành công",
+            count: rows.length,
+            data: rows
+        });
+    });
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// GET /api/rooms/:id (Lấy chi tiết phòng - Đã sửa lỗi thiếu tiện nghi)
 app.get("/api/rooms/:id", (req, res) => {
     const roomId = req.params.id;
+
+    // 1. Lấy thông tin cơ bản của phòng
     const sqlRoom = "SELECT * FROM rooms WHERE id = ?";
+    
+    // 2. Lấy danh sách ảnh
     const sqlImages = "SELECT image_url, is_thumbnail FROM room_images WHERE room_id = ?";
-    const sqlDetails = `
-            SELECT GROUP_CONCAT(DISTINCT f.name SEPARATOR ', ') AS features,
-                   GROUP_CONCAT(DISTINCT fa.name SEPARATOR ', ') AS facilities
-            FROM room_features rf 
-            LEFT JOIN features f ON rf.feature_id = f.id AND rf.room_id = ?
-            LEFT JOIN room_facilities rfa ON rfa.room_id = ?
-            LEFT JOIN facilities fa ON rfa.facility_id = fa.id
-            GROUP BY rf.room_id
-        `;
-        
+    
+    // 3. Lấy danh sách Tiện nghi (Facilities) - Truy vấn riêng biệt để không bị mất dữ liệu
+    const sqlFacilities = `
+        SELECT f.name 
+        FROM facilities f 
+        JOIN room_facilities rf ON f.id = rf.facility_id 
+        WHERE rf.room_id = ?
+    `;
+
+    // 4. Lấy danh sách Đặc điểm (Features) - Truy vấn riêng biệt
+    const sqlFeatures = `
+        SELECT f.name 
+        FROM features f 
+        JOIN room_features rf ON f.id = rf.feature_id 
+        WHERE rf.room_id = ?
+    `;
+
     db.query(sqlRoom, [roomId], (err, roomRows) => {
         if (err) return res.status(500).json({ message: "DB error", error: err });
         if (roomRows.length === 0) return res.status(404).json({ message: "Không tìm thấy phòng" });
 
         const room = roomRows[0];
-        
+
+        // Chạy song song 3 truy vấn phụ (Ảnh, Tiện nghi, Đặc điểm)
         Promise.all([
-            new Promise((resolve, reject) => db.query(sqlImages, [roomId], (err, rows) => err ? reject(err) : resolve(rows))),
-            new Promise((resolve, reject) => db.query(sqlDetails, [roomId, roomId], (err, rows) => err ? reject(err) : resolve(rows[0])))
+            new Promise((resolve) => db.query(sqlImages, [roomId], (e, r) => resolve(r || []))),
+            new Promise((resolve) => db.query(sqlFacilities, [roomId], (e, r) => resolve(r || []))),
+            new Promise((resolve) => db.query(sqlFeatures, [roomId], (e, r) => resolve(r || [])))
         ])
-        .then(([images, details]) => {
+        .then(([images, facilities, features]) => {
+            
+            // Backend tự nối mảng thành chuỗi "Wifi, Tivi, ..." để Frontend không cần sửa code cũ
+            // Đảm bảo lấy đủ tất cả các dòng tìm được
+            const facilitiesStr = facilities.map(item => item.name).join(', ');
+            const featuresStr = features.map(item => item.name).join(', ');
+
             res.json({
                 ...room,
                 gallery: images,
-                features: details ? details.features : '',
-                facilities: details ? details.facilities : ''
+                facilities: facilitiesStr, // Trả về chuỗi đầy đủ
+                features: featuresStr      // Trả về chuỗi đầy đủ
             });
         })
-        .catch(dbErr => {
-            console.error("Lỗi DB khi lấy chi tiết phòng:", dbErr);
-            res.status(500).json({ message: "DB error", error: dbErr.message });
+        .catch(error => {
+            console.error("Lỗi lấy chi tiết:", error);
+            res.status(500).json({ message: "Lỗi server khi lấy chi tiết phòng" });
         });
     });
 });
@@ -336,144 +461,117 @@ app.get("/api/admin/rooms", verifyAdminToken, (req, res) => {
 
 
 // POST /api/admin/rooms (Create New Room - Xử lý nhiều bảng)
-app.post("/api/admin/rooms", verifyAdminToken, (req, res) => { 
-    const { name, description, price_per_night, area, max_guests, main_image_url, facility_ids, feature_ids, gallery_images } = req.body;
-    if (!name || !price_per_night) return res.status(400).json({ message: "Thiếu tên hoặc giá phòng." });
+app.post("/api/admin/rooms", verifyAdminToken, (req, res) => {
+    const { name, description, price_per_night, area, max_guests, status, main_image_url, facility_ids, feature_ids, gallery_images } = req.body;
+
+    if (!name || !price_per_night) return res.status(400).json({ message: "Thiếu thông tin cơ bản" });
 
     db.beginTransaction(err => {
-        if (err) return res.status(500).json({ message: "DB error starting transaction" });
+        if (err) return res.status(500).json({ message: "Lỗi DB transaction" });
 
-        // 1. CHÈN VÀO BẢNG ROOMS
-        const sqlRoom = "INSERT INTO rooms (name, description, price_per_night, area, max_guests, main_image_url) VALUES (?, ?, ?, ?, ?, ?)";
-        db.query(sqlRoom, [name, description, price_per_night, area || null, max_guests || null, main_image_url || null], (errRoom, result) => {
-            if (errRoom) return db.rollback(() => res.status(500).json({ message: "Lỗi chèn phòng", error: errRoom }));
+        // 1. Chèn bảng Rooms
+        const sqlRoom = "INSERT INTO rooms (name, description, price_per_night, area, max_guests, main_image_url, status) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        db.query(sqlRoom, [name, description, price_per_night, area, max_guests, main_image_url, status], (errRoom, result) => {
+            if (errRoom) return db.rollback(() => res.status(500).json({ message: "Lỗi thêm phòng", error: errRoom }));
             const roomId = result.insertId;
 
             const promises = [];
 
-            // 2. CHÈN ROOM_FACILITIES (Nếu có)
-            if (Array.isArray(facility_ids) && facility_ids.length > 0) {
+            // 2. Chèn Tiện nghi
+            if (facility_ids && facility_ids.length > 0) {
                 const values = facility_ids.map(id => [roomId, id]);
                 promises.push(new Promise((resolve, reject) => {
-                    db.query("INSERT INTO room_facilities (room_id, facility_id) VALUES ?", [values], (err) => {
-                        if (err) reject(err); else resolve();
-                    });
+                    db.query("INSERT INTO room_facilities (room_id, facility_id) VALUES ?", [values], err => err ? reject(err) : resolve());
                 }));
             }
 
-            // 3. CHÈN ROOM_FEATURES (Nếu có)
-            if (Array.isArray(feature_ids) && feature_ids.length > 0) {
+            // 3. Chèn Đặc điểm
+            if (feature_ids && feature_ids.length > 0) {
                 const values = feature_ids.map(id => [roomId, id]);
                 promises.push(new Promise((resolve, reject) => {
-                    db.query("INSERT INTO room_features (room_id, feature_id) VALUES ?", [values], (err) => {
-                        if (err) reject(err); else resolve();
-                    });
+                    db.query("INSERT INTO room_features (room_id, feature_id) VALUES ?", [values], err => err ? reject(err) : resolve());
                 }));
             }
-            
-            // 4. CHÈN ROOM_IMAGES (Nếu có)
-            if (Array.isArray(gallery_images) && gallery_images.length > 0) {
-                const values = gallery_images.map(url => [roomId, url, 0]); // Giả định 0 = không phải thumbnail
+
+            // 4. Chèn Ảnh phụ (Gallery) - Nhận mảng tên file ["a.jpg", "b.jpg"]
+            if (gallery_images && gallery_images.length > 0) {
+                const values = gallery_images.map(imgName => [roomId, imgName, 0]);
                 promises.push(new Promise((resolve, reject) => {
-                    db.query("INSERT INTO room_images (room_id, image_url, is_thumbnail) VALUES ?", [values], (err) => {
-                        if (err) reject(err); else resolve();
-                    });
+                    db.query("INSERT INTO room_images (room_id, image_url, is_thumbnail) VALUES ?", [values], err => err ? reject(err) : resolve());
                 }));
             }
 
             Promise.all(promises)
                 .then(() => {
                     db.commit(errCommit => {
-                        if (errCommit) return db.rollback(() => res.status(500).json({ message: "Lỗi commit", error: errCommit }));
-                        res.status(201).json({ message: "Thêm phòng và chi tiết thành công", roomId });
+                        if (errCommit) return db.rollback(() => res.status(500).json({ message: "Lỗi commit" }));
+                        res.status(201).json({ message: "Thêm thành công", roomId });
                     });
                 })
-                .catch(promiseErr => {
-                    db.rollback(() => res.status(500).json({ message: "Lỗi chèn chi tiết phòng", error: promiseErr.message }));
+                .catch(errP => {
+                    db.rollback(() => res.status(500).json({ message: "Lỗi lưu chi tiết", error: errP.message }));
                 });
         });
     });
 });
 
-// PUT /api/admin/rooms/:id (Update Room - Đã tích hợp Status)
-app.put("/api/admin/rooms/:id", verifyAdminToken, (req, res) => { 
+// PUT: Sửa phòng (Nhận JSON thuần)
+app.put("/api/admin/rooms/:id", verifyAdminToken, (req, res) => {
     const roomId = req.params.id;
-    
-    // 1. Lấy thêm 'status' từ request body
-    const { name, description, price_per_night, area, max_guests, main_image_url, status, facility_ids, feature_ids, gallery_images } = req.body;
-    
-    db.beginTransaction(err => {
-        if (err) return res.status(500).json({ message: "DB error starting transaction" });
+    const { name, description, price_per_night, area, max_guests, status, main_image_url, facility_ids, feature_ids, gallery_images } = req.body;
 
-        // 2. Cập nhật SQL: Thêm "status=?" vào câu lệnh
-        const sqlUpdateRoom = "UPDATE rooms SET name=?, description=?, price_per_night=?, area=?, max_guests=?, main_image_url=?, status=? WHERE id=?";
-        
-        // 3. Thêm biến status vào mảng tham số (Mặc định là 'available' nếu không gửi lên)
-        db.query(sqlUpdateRoom, [
-            name, 
-            description, 
-            price_per_night, 
-            area || null, 
-            max_guests || null, 
-            main_image_url || null, 
-            status || 'available', // <--- Tham số status mới
-            roomId
-        ], (errUpdate, result) => {
-            if (errUpdate) return db.rollback(() => res.status(500).json({ message: "Lỗi cập nhật phòng", error: errUpdate }));
-            if (result.affectedRows === 0) return db.rollback(() => res.status(404).json({ message: "Không tìm thấy phòng để cập nhật" }));
+    db.beginTransaction(err => {
+        if (err) return res.status(500).json({ message: "Lỗi DB transaction" });
+
+        const sqlUpdate = "UPDATE rooms SET name=?, description=?, price_per_night=?, area=?, max_guests=?, status=?, main_image_url=? WHERE id=?";
+        db.query(sqlUpdate, [name, description, price_per_night, area, max_guests, status, main_image_url, roomId], (errUpd, result) => {
+            if (errUpd) return db.rollback(() => res.status(500).json({ message: "Lỗi update", error: errUpd }));
 
             const promises = [];
 
-            // --- CÁC PHẦN DƯỚI GIỮ NGUYÊN KHÔNG ĐỔI ---
-
-            // 2. XÓA VÀ CHÈN LẠI ROOM_FACILITIES
+            // Xóa cũ -> Thêm mới (Facilities)
             promises.push(new Promise((resolve, reject) => {
                 db.query("DELETE FROM room_facilities WHERE room_id=?", [roomId], (errDel) => {
                     if (errDel) return reject(errDel);
-                    if (Array.isArray(facility_ids) && facility_ids.length > 0) {
+                    if (facility_ids && facility_ids.length > 0) {
                         const values = facility_ids.map(id => [roomId, id]);
-                        db.query("INSERT INTO room_facilities (room_id, facility_id) VALUES ?", [values], (errIns) => {
-                            if (errIns) reject(errIns); else resolve();
-                        });
-                    } else { resolve(); }
+                        db.query("INSERT INTO room_facilities (room_id, facility_id) VALUES ?", [values], err => err ? reject(err) : resolve());
+                    } else resolve();
                 });
             }));
 
-            // 3. XÓA VÀ CHÈN LẠI ROOM_FEATURES
+            // Xóa cũ -> Thêm mới (Features)
             promises.push(new Promise((resolve, reject) => {
                 db.query("DELETE FROM room_features WHERE room_id=?", [roomId], (errDel) => {
                     if (errDel) return reject(errDel);
-                    if (Array.isArray(feature_ids) && feature_ids.length > 0) {
+                    if (feature_ids && feature_ids.length > 0) {
                         const values = feature_ids.map(id => [roomId, id]);
-                        db.query("INSERT INTO room_features (room_id, feature_id) VALUES ?", [values], (errIns) => {
-                            if (errIns) reject(errIns); else resolve();
-                        });
-                    } else { resolve(); }
+                        db.query("INSERT INTO room_features (room_id, feature_id) VALUES ?", [values], err => err ? reject(err) : resolve());
+                    } else resolve();
                 });
             }));
-            
-            // 4. XÓA VÀ CHÈN LẠI ROOM_IMAGES (Gallery)
+
+            // Xóa cũ -> Thêm mới (Gallery)
+            // Lưu ý: Ở đây ta xóa hết ảnh cũ và thêm lại danh sách mới client gửi lên
             promises.push(new Promise((resolve, reject) => {
                 db.query("DELETE FROM room_images WHERE room_id=?", [roomId], (errDel) => {
                     if (errDel) return reject(errDel);
-                    if (Array.isArray(gallery_images) && gallery_images.length > 0) {
-                        const values = gallery_images.map(url => [roomId, url, 0]);
-                        db.query("INSERT INTO room_images (room_id, image_url, is_thumbnail) VALUES ?", [values], (errIns) => {
-                            if (errIns) reject(errIns); else resolve();
-                        });
-                    } else { resolve(); }
+                    if (gallery_images && gallery_images.length > 0) {
+                        const values = gallery_images.map(imgName => [roomId, imgName, 0]);
+                        db.query("INSERT INTO room_images (room_id, image_url, is_thumbnail) VALUES ?", [values], err => err ? reject(err) : resolve());
+                    } else resolve();
                 });
             }));
 
             Promise.all(promises)
                 .then(() => {
                     db.commit(errCommit => {
-                        if (errCommit) return db.rollback(() => res.status(500).json({ message: "Lỗi commit sau cập nhật", error: errCommit }));
-                        res.json({ message: "Cập nhật phòng và trạng thái thành công", roomId });
+                        if (errCommit) return db.rollback(() => res.status(500).json({ message: "Lỗi commit" }));
+                        res.json({ message: "Cập nhật thành công" });
                     });
                 })
-                .catch(promiseErr => {
-                    db.rollback(() => res.status(500).json({ message: "Lỗi cập nhật chi tiết phòng", error: promiseErr.message }));
+                .catch(errP => {
+                    db.rollback(() => res.status(500).json({ message: "Lỗi cập nhật chi tiết", error: errP.message }));
                 });
         });
     });
@@ -1489,33 +1587,54 @@ app.get("/api/admin/reviews", verifyAdminToken, (req, res) => {
     });
 });
 
-// 5.2 POST: Thêm đánh giá mới
+// 5.2 POST: Thêm đánh giá mới (CHỈ CHO PHÉP NẾU ĐÃ ĐẶT PHÒNG)
 app.post("/api/reviews", verifyToken, (req, res) => {
     const { room_id, rating_point, review_text } = req.body;
 
-    // Lấy user_id an toàn: Ưu tiên req.user.id, nếu không có thì lấy req.userId
+    // Lấy user_id chuẩn từ token
     const user_id = (req.user && req.user.id) ? req.user.id : req.userId;
 
-    if (!user_id) {
-        return res.status(401).json({ message: "Không xác định được người dùng." });
-    }
+    if (!user_id) return res.status(401).json({ message: "Chưa đăng nhập." });
+    if (!room_id || !rating_point) return res.status(400).json({ message: "Thiếu thông tin đánh giá." });
 
-    if (!room_id || !rating_point) {
-        return res.status(400).json({ message: "Thiếu thông tin room_id hoặc điểm đánh giá" });
-    }
+    // BƯỚC 1: KIỂM TRA LỊCH SỬ ĐẶT PHÒNG
+    // Chỉ cho phép đánh giá nếu user đã có đơn hàng ở trạng thái: confirmed, checked_in, paid, success
+    const sqlCheckBooking = `
+        SELECT id 
+        FROM booking_order 
+        WHERE user_id = ? 
+        AND room_id = ? 
+        AND order_status IN ('confirmed', 'checked_in', 'paid', 'success')
+        LIMIT 1
+    `;
 
-    const sql = "INSERT INTO rating_review (room_id, user_id, rating_point, review_text, created_at) VALUES (?, ?, ?, ?, NOW())";
-    
-    db.query(sql, [room_id, user_id, rating_point, review_text], (err, result) => {
-        if (err) {
-            console.error("Lỗi SQL Review:", err); // Log lỗi ra terminal để dễ debug
-            return res.status(500).json({ message: "Lỗi DB khi thêm review", error: err });
+    db.query(sqlCheckBooking, [user_id, room_id], (errCheck, rows) => {
+        if (errCheck) {
+            console.error("Lỗi kiểm tra booking:", errCheck);
+            return res.status(500).json({ message: "Lỗi hệ thống khi kiểm tra quyền đánh giá." });
         }
+
+        // Nếu không tìm thấy đơn đặt phòng hợp lệ
+        if (rows.length === 0) {
+            return res.status(403).json({ 
+                message: "Bạn chưa trải nghiệm phòng này (hoặc đơn chưa được xác nhận), nên không thể đánh giá." 
+            });
+        }
+
+        // BƯỚC 2: NẾU HỢP LỆ -> LƯU ĐÁNH GIÁ
+        const sqlInsert = "INSERT INTO rating_review (room_id, user_id, rating_point, review_text, created_at) VALUES (?, ?, ?, ?, NOW())";
         
-        res.status(201).json({ 
-            message: "Đánh giá thành công", 
-            id: result.insertId,
-            data: { room_id, user_id, rating_point, review_text }
+        db.query(sqlInsert, [room_id, user_id, rating_point, review_text], (err, result) => {
+            if (err) {
+                console.error("Lỗi thêm review:", err);
+                return res.status(500).json({ message: "Lỗi khi lưu đánh giá", error: err });
+            }
+            
+            res.status(201).json({ 
+                message: "Cảm ơn bạn! Đánh giá đã được đăng thành công.", 
+                id: result.insertId,
+                data: { room_id, user_id, rating_point, review_text }
+            });
         });
     });
 });
@@ -1569,6 +1688,107 @@ app.delete("/api/reviews/:id", verifyToken, (req, res) => {
 
         res.json({ message: "Xóa đánh giá thành công" });
     });
+});
+
+/* ==========================================================
+   API TÌM KIẾM PHÒNG NÂNG CAO (PHIÊN BẢN FIX TRIỆT ĐỂ)
+   GET /api/rooms/search/advanced
+
+========================================================== */
+app.get("/api/rooms/search/advanced", (req, res) => {
+    const { checkIn, checkOut, maxPrice, guests } = req.query;
+    const queryParams = [];
+
+    // Lấy các phòng đang hoạt động
+    let sql = `SELECT r.* FROM rooms r WHERE r.status IN ('active', 'available', 'booked') `;
+
+    // Lọc ngày trống: Phòng KHÔNG được có đơn đặt nào trùng vào khoảng ngày này
+    if (checkIn && checkOut) {
+        sql += `
+            AND NOT EXISTS (
+                SELECT 1 FROM booking_order b
+                JOIN booking_details d ON b.id = d.booking_id
+                WHERE b.room_id = r.id
+                AND b.order_status IN ('confirmed', 'checked_in', 'paid')
+                AND (DATE(?) < DATE(d.check_out_date) AND DATE(?) > DATE(d.check_in_date))
+            )
+        `;
+        queryParams.push(checkIn, checkOut); 
+    }
+
+    if (maxPrice) {
+        sql += " AND r.price_per_night <= ?";
+        queryParams.push(parseFloat(maxPrice));
+    }
+
+    if (guests) {
+        sql += " AND r.max_guests >= ?";
+        queryParams.push(parseInt(guests));
+    }
+
+    sql += " ORDER BY r.price_per_night ASC";
+
+    db.query(sql, queryParams, (err, rows) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(rows); // Trả về mảng trực tiếp cho Frontend dễ map
+    });
+});
+
+// Thêm vào file index.js của bạn
+
+app.post("/api/chatbot", (req, res) => {
+    const userMessage = req.body.message.toLowerCase();
+    
+    // 1. Phân tích ý định người dùng (Simple NLP bằng từ khóa)
+    let maxPrice = null;
+    let guests = 1;
+    
+    // Quét giá tiền
+    if (userMessage.includes("dưới 500") || userMessage.includes("500k")) maxPrice = 500000;
+    else if (userMessage.includes("dưới 1 triệu") || userMessage.includes("1tr")) maxPrice = 1000000;
+    else if (userMessage.includes("dưới 5 triệu") || userMessage.includes("5tr")) maxPrice = 5000000;
+
+    // Quét số lượng khách
+    const guestMatch = userMessage.match(/(\d+)\s*khách/) || userMessage.match(/cho\s*(\d+)\s*người/);
+    if (guestMatch) guests = parseInt(guestMatch[1]);
+
+    // 2. Nếu người dùng hỏi về tìm phòng
+    if (userMessage.includes("tìm phòng") || userMessage.includes("còn phòng") || userMessage.includes("phòng trống")) {
+        let sql = `SELECT name, price_per_night, max_guests FROM rooms WHERE status = 'available'`;
+        let params = [];
+
+        if (maxPrice) {
+            sql += " AND price_per_night <= ?";
+            params.push(maxPrice);
+        }
+        sql += " AND max_guests >= ?";
+        params.push(guests);
+
+        db.query(sql, params, (err, rows) => {
+            if (err) return res.json({ reply: "Xin lỗi, tôi gặp lỗi khi truy cập dữ liệu." });
+            
+            if (rows.length === 0) {
+                return res.json({ reply: `Rất tiếc, tôi không tìm thấy phòng nào phù hợp cho ${guests} khách${maxPrice ? ` với giá dưới ${maxPrice.toLocaleString()}đ` : ""}.` });
+            }
+
+            let reply = `Tôi tìm thấy ${rows.length} phòng phù hợp cho bạn: \n`;
+            rows.slice(0, 3).forEach(room => {
+                reply += `- ${room.name}: ${parseFloat(room.price_per_night).toLocaleString()}đ/đêm \n`;
+            });
+            reply += "\nBạn có muốn xem chi tiết không?";
+            res.json({ reply });
+        });
+    } 
+    // 3. Các câu hỏi thông thường khác
+    else if (userMessage.includes("xin chào") || userMessage.includes("hi")) {
+        res.json({ reply: "Xin chào! Tôi là trợ lý ảo của HotelBooking. Tôi có thể giúp bạn tìm phòng theo giá và số lượng người." });
+    }
+    else if (userMessage.includes("địa chỉ") || userMessage.includes("ở đâu")) {
+        res.json({ reply: "Khách sạn chúng tôi nằm tại trung tâm Quận 1, TP. Hồ Chí Minh." });
+    }
+    else {
+        res.json({ reply: "Xin lỗi, tôi chưa hiểu ý bạn. Bạn có thể hỏi ví dụ: 'Tìm phòng cho 2 người giá dưới 1tr' không?" });
+    }
 });
 
 /* ==========================

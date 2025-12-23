@@ -1,192 +1,279 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 
-// 🎨 CÁC ĐỊNH NGHĨA STYLE
-
-const ROYAL_COLOR = "#f3c300"; // Màu vàng cam chủ đạo
-const DARK_BG = "#0f172a"; // Màu nền tối
+// 🎨 MÀU SẮC THEO PHONG CÁCH TRIP.COM
+const TRIP_BLUE = "#2b56cc"; 
+const TRIP_ORANGE = "#ff9500"; 
+const TEXT_WHITE = "#ffffff";
+const HOVER_BG = "rgba(255, 255, 255, 0.1)"; 
 
 function Navbar() {
     const navigate = useNavigate();
-    const [user, setUser] = useState(null); // { username: '...' } hoặc null
+    const location = useLocation();
+    const [user, setUser] = useState(null);
+    
+    // --- STATE CHO MOBILE ---
+    const [isMobile, setIsMobile] = useState(window.innerWidth < 992);
+    const [menuOpen, setMenuOpen] = useState(false); 
 
-    const styles = {
-        // --- Container chung ---
-        navbarContainer: {
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            backgroundColor: '#fff', 
-            padding: '15px 40px',
-            borderBottom: '1px solid #ddd',
-            position: 'sticky',
-            top: 0,
-            zIndex: 1000,
-            boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-            fontFamily: 'serif',
-        },
-        
-        // --- Logo ---
-        navbarLogo: {
-            fontSize: '26px',
-            fontWeight: '700',
-            color: DARK_BG, 
-            textDecoration: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-        },
-        logoIcon: {
-            fontSize: '30px',
-            color: ROYAL_COLOR,
-        },
-
-        // --- Danh sách liên kết và Nút hành động ---
-        navLinks: {
-            listStyle: 'none',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '20px',
-            margin: 0,
-            padding: 0,
-        },
-        
-        // --- Liên kết chung ---
-        navLink: {
-            textDecoration: 'none',
-            color: DARK_BG,
-            fontWeight: 500,
-            fontSize: '16px',
-            padding: '5px 0',
-            transition: 'color 0.3s ease',
-        },
-        
-        // --- Nút hành động (Đăng nhập/Đăng xuất) ---
-        actionButton: {
-            backgroundColor: ROYAL_COLOR, 
-            color: DARK_BG, 
-            padding: '8px 15px',
-            borderRadius: '4px',
-            transition: 'background-color 0.3s ease',
-            textDecoration: 'none',
-            fontWeight: 'bold',
-        },
-        
-        // --- Tên người dùng ---
-        userName: {
-            color: DARK_BG,
-            fontWeight: 'bold',
-            marginRight: '10px',
-            fontSize: '16px',
-            cursor: 'default',
-        },
-    };
-
-    // Hàm kiểm tra trạng thái đăng nhập
     const checkAuthStatus = () => {
         const storedUsername = localStorage.getItem('username'); 
-        if (storedUsername) {
-            setUser({ username: storedUsername });
-        } else {
-            setUser(null);
-        }
+        if (storedUsername) setUser({ username: storedUsername });
+        else setUser(null);
     };
 
-    // useEffect Lắng nghe sự kiện
     useEffect(() => {
-        // Chạy lần đầu khi component mount
         checkAuthStatus();
-
-        // 🎯 Lắng nghe sự kiện tùy chỉnh từ Login/Register để cập nhật trạng thái
         window.addEventListener('auth-change', checkAuthStatus);
+        
+        const handleResize = () => {
+            const mobile = window.innerWidth < 992;
+            setIsMobile(mobile);
+            if (!mobile) setMenuOpen(false); 
+        };
+        window.addEventListener('resize', handleResize);
 
-        // Cleanup: xóa listener khi component unmount
         return () => {
             window.removeEventListener('auth-change', checkAuthStatus);
+            window.removeEventListener('resize', handleResize);
         };
-    }, []); 
+    }, []);
 
-    // XỬ LÝ ĐĂNG XUẤT
     const handleLogout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('userId');
         localStorage.removeItem('username');
-        setUser(null); // Cập nhật trạng thái ngay lập tức
+        setUser(null);
+        setMenuOpen(false);
         alert("Đã đăng xuất thành công!");
         navigate('/login'); 
     };
 
-    // Helper components (giữ nguyên logic hover)
-    const ActionLink = ({ to, onClick, children }) => (
-        <Link 
-            to={to} 
-            onClick={onClick}
-            style={styles.actionButton}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#d6ad00'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = ROYAL_COLOR}
-        >
-            {children}
-        </Link>
-    );
+    // 🎨 STYLES OBJECT
+    const styles = {
+        navbarContainer: {
+            backgroundColor: TRIP_BLUE,
+            padding: isMobile ? '10px 20px' : '0 40px', 
+            height: isMobile ? '60px' : '72px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            position: 'sticky',
+            top: 0,
+            zIndex: 1000,
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+        },
 
-    const NavItemLink = ({ to, children }) => (
-        <Link 
-            to={to} 
-            style={styles.navLink}
-            onMouseEnter={(e) => e.currentTarget.style.color = ROYAL_COLOR}
-            onMouseLeave={(e) => e.currentTarget.style.color = DARK_BG}
-        >
-            {children}
-        </Link>
-    );
+        logoLink: {
+            textDecoration: 'none',
+            display: 'flex',
+            alignItems: 'center',
+            fontSize: '24px',
+            fontWeight: '800',
+            color: TEXT_WHITE,
+            letterSpacing: '-0.5px',
+        },
+        logoDot: {
+            color: TRIP_ORANGE,
+            fontSize: '30px',
+            lineHeight: '0',
+            marginLeft: '2px',
+            marginBottom: '5px'
+        },
+
+        navWrapper: {
+            display: isMobile ? (menuOpen ? 'flex' : 'none') : 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
+            position: isMobile ? 'absolute' : 'static',
+            top: isMobile ? '60px' : 'auto',
+            left: 0,
+            width: isMobile ? '100%' : '100%',
+            backgroundColor: isMobile ? TRIP_BLUE : 'transparent',
+            padding: isMobile ? '0' : '0', // Fix padding wrapper
+            alignItems: isMobile ? 'flex-start' : 'center',
+            justifyContent: 'space-between', 
+            boxShadow: isMobile ? '0 10px 20px rgba(0,0,0,0.2)' : 'none',
+        },
+
+        navLinksLeft: {
+            display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
+            listStyle: 'none',
+            gap: isMobile ? '0' : '10px',
+            margin: 0,
+            padding: 0,
+            width: isMobile ? '100%' : 'auto',
+        },
+        
+        navLinksRight: {
+            display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
+            listStyle: 'none',
+            gap: isMobile ? '15px' : '15px',
+            margin: isMobile ? '0' : '0',
+            padding: 0,
+            alignItems: isMobile ? 'flex-start' : 'center', // Mobile căn trái
+            width: isMobile ? '100%' : 'auto',
+        },
+
+        linkItem: {
+            textDecoration: 'none',
+            color: 'rgba(255, 255, 255, 0.9)',
+            fontSize: '15px',
+            fontWeight: '600',
+            // 🛠️ FIX: Padding thống nhất 15px 20px cho cả mobile
+            padding: isMobile ? '15px 20px' : '10px 15px',
+            borderRadius: isMobile ? '0' : '20px',
+            transition: 'all 0.2s ease',
+            display: 'block',
+            width: isMobile ? '100%' : 'auto',
+            borderBottom: isMobile ? '1px solid rgba(255,255,255,0.1)' : 'none',
+            boxSizing: 'border-box', // Đảm bảo padding không làm vỡ layout
+        },
+
+        authButton: {
+            backgroundColor: TEXT_WHITE,
+            color: TRIP_BLUE,
+            padding: '8px 16px',
+            borderRadius: '4px',
+            textDecoration: 'none',
+            fontWeight: 'bold',
+            fontSize: '14px',
+            transition: 'opacity 0.3s',
+            whiteSpace: 'nowrap',
+            display: isMobile ? 'block' : 'inline-block',
+            textAlign: 'center',
+            margin: isMobile ? '20px' : '0', // Mobile có margin riêng
+            width: isMobile ? 'calc(100% - 40px)' : 'auto',
+        },
+
+        hamburger: {
+            display: isMobile ? 'block' : 'none',
+            background: 'none',
+            border: 'none',
+            color: 'white',
+            fontSize: '28px',
+            cursor: 'pointer',
+            padding: '5px',
+        },
+        
+        activeBorder: {
+            position: 'absolute',
+            bottom: isMobile ? '0' : '5px',
+            left: isMobile ? '0' : '15px',
+            width: isMobile ? '4px' : 'calc(100% - 30px)',
+            height: isMobile ? '100%' : '2px',
+            backgroundColor: 'white',
+        },
+
+        // 🛠️ STYLE MỚI CHO USER GREETING TRÊN MOBILE
+        userGreetingText: {
+            color: 'white', 
+            fontWeight: 'bold', 
+            // Fix Padding giống hệt Link Item (15px 20px)
+            padding: isMobile ? '15px 20px' : '0', 
+            fontSize: '15px',
+            width: isMobile ? '100%' : 'auto',
+            display: 'block',
+            boxSizing: 'border-box',
+            // Thêm đường kẻ trên đầu để tách biệt với menu trên
+            borderTop: isMobile ? '1px solid rgba(255,255,255,0.1)' : 'none',
+            marginTop: isMobile ? '10px' : '0',
+        }
+    };
+
+    const NavLink = ({ to, label, isAction = false }) => {
+        const isActive = location.pathname === to;
+        
+        if (isAction) {
+            return (
+                <Link 
+                    to={to} 
+                    style={styles.authButton}
+                    onClick={() => setMenuOpen(false)}
+                >
+                    {label}
+                </Link>
+            );
+        }
+
+        return (
+            <Link 
+                to={to} 
+                style={{
+                    ...styles.linkItem,
+                    color: isActive ? 'white' : 'rgba(255, 255, 255, 0.8)',
+                }}
+                onClick={() => setMenuOpen(false)}
+            >
+                {label}
+                {isActive && <div style={styles.activeBorder}></div>}
+            </Link>
+        );
+    };
 
     return (
         <nav style={styles.navbarContainer}>
-            {/* Logo */}
-            <Link to="/" style={styles.navbarLogo}>
-                <span role="img" aria-label="hotel-icon" style={styles.logoIcon}>🏨</span> Hotel Booking
+            <Link to="/" style={styles.logoLink}>
+                HotelBooking<span style={styles.logoDot}>.</span>online
             </Link>
-            
-            {/* Các liên kết và Nút hành động */}
-            <ul style={styles.navLinks}>
-                <li>
-                    <NavItemLink to="/">Trang chủ</NavItemLink>
-                </li>
-                <li>
-                    <NavItemLink to="/rooms">Phòng & Khách sạn</NavItemLink>
-                </li>
-                 <li>
-                    <NavItemLink to="/about">Giới Thiệu</NavItemLink>
-                </li>
-                 <li>
-                    <NavItemLink to="/contact">Liên Hệ</NavItemLink>
-                </li>
-                <li>
-                    <NavItemLink to="/bookings">Lịch Sử Đặt Phòng</NavItemLink>
-                </li>
-                {/* CONDITIONAL RENDERING */}
-                {user ? (
-                    <>
-                        <li style={{display: 'flex', alignItems: 'center'}}>
-                            {/* Tên người dùng */}
-                            <span style={styles.userName}>
-                                Xin chào, {user.username}!
-                            </span>
-                            {/* Nút Đăng xuất */}
-                            <ActionLink to="#" onClick={handleLogout}>
-                                Đăng xuất
-                            </ActionLink>
-                        </li>
-                    </>
-                ) : (
-                    <li>
-                        {/* Nút Đăng nhập */}
-                        <ActionLink to="/login">
-                            Đăng nhập
-                        </ActionLink>
+
+            <button style={styles.hamburger} onClick={() => setMenuOpen(!menuOpen)}>
+                {menuOpen ? '✕' : '☰'}
+            </button>
+
+            <div style={styles.navWrapper}>
+                <ul style={styles.navLinksLeft}>
+                    <li><NavLink to="/rooms" label="Khách sạn & Chỗ nghỉ" /></li>
+                    <li><NavLink to="/bookings" label="Lịch sử đặt phòng" /></li>
+                    <li><NavLink to="/about" label="Giới thiệu" /></li>
+                </ul>
+
+                <ul style={styles.navLinksRight}>
+                    <li style={{display: isMobile ? 'none' : 'block'}}>
+                        <a href="#" style={{...styles.linkItem, fontSize: '14px'}}>Ứng dụng</a>
                     </li>
-                )}
-            </ul>
+                    <li style={{display: isMobile ? 'none' : 'block'}}>
+                        <a href="#" style={{...styles.linkItem, fontSize: '14px'}}>Hỗ trợ</a>
+                    </li>
+
+                    {user ? (
+                        <li style={{ 
+                            display: 'flex', 
+                            flexDirection: isMobile ? 'column' : 'row', 
+                            alignItems: isMobile ? 'flex-start' : 'center', // Mobile căn trái
+                            gap: isMobile ? '0' : '10px', // Bỏ gap trên mobile vì đã có padding
+                            width: isMobile ? '100%' : 'auto'
+                        }}>
+                            {/* 🛠️ FIX TEXT HIỂN THỊ */}
+                            <span style={styles.userGreetingText}>
+                                Hi, {user.username}
+                            </span>
+                            
+                            <button 
+                                onClick={handleLogout}
+                                style={{
+                                    ...styles.authButton, 
+                                    backgroundColor: 'rgba(255,255,255,0.2)', 
+                                    color: 'white',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    // Mobile: Cách chữ Hi 1 chút, margin 2 bên 20px
+                                    marginTop: isMobile ? '0' : '0',
+                                    marginBottom: isMobile ? '20px' : '0'
+                                }}
+                            >
+                                Đăng xuất
+                            </button>
+                        </li>
+                    ) : (
+                        <li style={{width: isMobile ? '100%' : 'auto'}}>
+                            <NavLink to="/login" label="Đăng Nhập / Đăng Ký" isAction={true} />
+                        </li>
+                    )}
+                </ul>
+            </div>
         </nav>
     );
 }

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import axios from "axios";
+// import axios from "axios"; // Đã thay bằng axiosClient
+import axiosClient from "../api/config"; 
 
 // 🎨 CÁC ĐỊNH NGHĨA STYLE (Giữ nguyên)
 const ROYAL_COLOR = "#f3c300";
@@ -78,7 +79,8 @@ function Login() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
-    const API_URL = "http://localhost:3001/api/auth/login";
+    // 💡 URL giờ đây cực kỳ ngắn gọn vì đã có baseURL trong axiosClient
+    const LOGIN_ENDPOINT = "/auth/login";
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -92,22 +94,23 @@ function Login() {
         setLoading(true);
 
         try {
-            const response = await axios.post(API_URL, { username, password });
+            // Sử dụng axiosClient thay cho axios trực tiếp
+            const response = await axiosClient.post(LOGIN_ENDPOINT, { username, password });
 
-            // 💾 LƯU username VÀO Local Storage (Đã đúng)
+            // 💾 Lưu thông tin vào Local Storage
             localStorage.setItem('token', response.data.token);
             localStorage.setItem('userId', response.data.userId);
             localStorage.setItem('username', response.data.username); 
 
-            // 📢 KÍCH HOẠT SỰ KIỆN để Navbar cập nhật trạng thái
+            // 📢 Kích hoạt sự kiện để Navbar/Sidebar cập nhật giao diện ngay lập tức
             window.dispatchEvent(new Event('auth-change')); 
             
             alert("Đăng nhập thành công!");
-            
             navigate('/'); 
 
         } catch (err) {
-            const errorMessage = err.response?.data?.message || "Đã xảy ra lỗi không xác định.";
+            // Xử lý lỗi tập trung hơn
+            const errorMessage = err.response?.data?.message || "Sai tên đăng nhập hoặc mật khẩu.";
             setError(errorMessage);
         } finally {
             setLoading(false);
@@ -120,7 +123,6 @@ function Login() {
                 <h2 style={styles.heading}>ĐĂNG NHẬP HỆ THỐNG</h2>
                 
                 <form onSubmit={handleSubmit}>
-                    
                     <div style={styles.formGroup}>
                         <label style={{ color: TEXT_COLOR, display: 'block', marginBottom: '5px' }}>
                             Tên đăng nhập

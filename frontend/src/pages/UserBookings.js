@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+// import axios from 'axios'; // Đã thay thế bằng axiosClient
+import axiosClient from "../api/config"; 
 import { 
     FaHistory, FaCalendarAlt, FaClock, FaUser, FaTrashAlt, 
     FaMoneyBillWave, FaIdCard, FaBed, FaInfoCircle 
@@ -37,8 +38,6 @@ const styles = {
         padding: '50px',
         textAlign: 'center',
     },
-    
-    // --- Booking Card ---
     card: {
         backgroundColor: '#fff',
         borderRadius: '12px',
@@ -65,23 +64,19 @@ const styles = {
     },
     bookingDate: {
         fontSize: '0.9rem',
-        color: '#9ca3af', // Xám nhạt
+        color: '#9ca3af',
         display: 'flex',
         alignItems: 'center',
         gap: '5px'
     },
-
-    // --- Card Body (Grid Layout) ---
     cardBody: {
         padding: '25px',
         display: 'grid',
-        gridTemplateColumns: '1.5fr 1fr', // Cột trái (Phòng) lớn hơn cột phải (Thông tin)
+        gridTemplateColumns: window.innerWidth < 768 ? '1fr' : '1.5fr 1fr',
         gap: '30px',
     },
-    
-    // Cột Trái: Danh sách phòng
     roomList: {
-        borderRight: '1px dashed #e5e7eb',
+        borderRight: window.innerWidth < 768 ? 'none' : '1px dashed #e5e7eb',
         paddingRight: '20px',
     },
     sectionTitle: {
@@ -121,8 +116,6 @@ const styles = {
         color: '#6b7280',
         lineHeight: '1.5',
     },
-
-    // Cột Phải: Thông tin khách & Thanh toán
     infoColumn: {
         display: 'flex',
         flexDirection: 'column',
@@ -144,12 +137,10 @@ const styles = {
     totalPrice: {
         fontSize: '1.6rem',
         fontWeight: 'bold',
-        color: '#d97706', // Màu cam đậm
+        color: '#d97706',
         textAlign: 'right',
         display: 'block',
     },
-    
-    // --- Footer Actions ---
     cardFooter: {
         padding: '15px 25px',
         backgroundColor: '#f9fafb',
@@ -174,7 +165,7 @@ const styles = {
         backgroundColor: '#fff',
         color: DARK_BG,
         border: '1px solid #d1d5db',
-        textDecoration: 'none', // Cho Link
+        textDecoration: 'none',
     },
     btnCancel: {
         backgroundColor: '#fff',
@@ -186,7 +177,7 @@ const styles = {
         borderRadius: '20px',
         fontSize: '0.75rem',
         fontWeight: 'bold',
-        backgroundColor: '#10b981', // Xanh lá
+        backgroundColor: '#10b981',
         color: 'white',
         marginLeft: '10px',
     }
@@ -200,8 +191,6 @@ function UserBookings() {
     const [isCancelling, setIsCancelling] = useState(false);
 
     const token = localStorage.getItem('token');
-    const API_BOOKINGS = "http://localhost:3001/api/bookings";
-    const API_CANCEL = "http://localhost:3001/api/bookings"; 
 
     const handleAuthError = useCallback((message = "Phiên đăng nhập hết hạn.") => {
         localStorage.clear();
@@ -210,6 +199,7 @@ function UserBookings() {
         navigate('/login');
     }, [navigate]);
 
+    // 1. Hàm lấy danh sách đơn đặt - SỬ DỤNG axiosClient
     const fetchBookings = useCallback(async () => {
         setLoading(true);
         if (!token) {
@@ -217,7 +207,8 @@ function UserBookings() {
             return handleAuthError("Vui lòng đăng nhập để xem lịch sử.");
         }
         try {
-            const res = await axios.get(API_BOOKINGS, { headers: { Authorization: `Bearer ${token}` } });
+            // Chỉ cần gọi endpoint '/bookings'
+            const res = await axiosClient.get("/bookings");
             setBookings(res.data); 
         } catch (err) {
             if (err.response?.status === 401) handleAuthError();
@@ -234,11 +225,13 @@ function UserBookings() {
         return items.reduce((acc, item) => acc + (item.unit_price || 0) * (item.quantity || 0), 0);
     };
     
+    // 2. Hàm hủy đơn đặt - SỬ DỤNG axiosClient
     const handleCancelBooking = async (bookingId) => {
         if (!window.confirm(`Bạn có chắc chắn muốn hủy đơn #${bookingId}? Hành động này không thể hoàn tác.`)) return;
         setIsCancelling(true);
         try {
-            await axios.delete(`${API_CANCEL}/${bookingId}`, { headers: { Authorization: `Bearer ${token}` } });
+            // Gọi endpoint DELETE '/bookings/:id'
+            await axiosClient.delete(`/bookings/${bookingId}`);
             alert(`Đã hủy thành công đơn hàng #${bookingId}`);
             fetchBookings(); // Reload lại danh sách
         } catch (err) {
@@ -264,7 +257,6 @@ function UserBookings() {
             {bookings.map((booking) => (
                 <div key={booking.booking_id} style={styles.card}>
                     
-                    {/* 1. Header Card */}
                     <div style={styles.cardHeader}>
                         <div style={styles.bookingId}>
                             #{booking.booking_id}
@@ -275,10 +267,7 @@ function UserBookings() {
                         </div>
                     </div>
 
-                    {/* 2. Body Card */}
                     <div style={styles.cardBody}>
-                        
-                        {/* Cột Trái: Danh sách phòng */}
                         <div style={styles.roomList}>
                             <div style={styles.sectionTitle}><FaBed style={{marginRight:5}}/> Danh Sách Phòng</div>
                             {booking.items?.map(item => (
@@ -298,7 +287,6 @@ function UserBookings() {
                             ))}
                         </div>
 
-                        {/* Cột Phải: Thông tin chi tiết */}
                         <div style={styles.infoColumn}>
                             <div>
                                 <div style={styles.sectionTitle}><FaUser style={{marginRight:5}}/> Thông Tin Khách</div>
@@ -328,7 +316,6 @@ function UserBookings() {
                         </div>
                     </div>
 
-                    {/* 3. Footer Actions */}
                     <div style={styles.cardFooter}>
                         <button
                             onClick={() => handleCancelBooking(booking.booking_id)}
