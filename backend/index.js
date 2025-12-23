@@ -20,7 +20,7 @@ const db = mysql.createConnection({
     database: process.env.DB_NAME || 'khachsan',                                   // Lấy từ DATABASE
     ssl: {
         minVersion: 'TLSv1.2',
-        rejectUnauthorized: true // TiDB Cloud yêu cầu SSL an toàn
+        rejectUnauthorized: false // TiDB Cloud yêu cầu SSL an toàn
     }
 });
 
