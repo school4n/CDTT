@@ -166,7 +166,7 @@ function Home() {
 
             {/* 3. DANH SÁCH GỢI Ý */}
             <h2 style={{...styles.heading, fontSize: isMobile ? '1.5rem' : '2rem'}}>
-                Điểm Đến Nổi Bật cho dân chơi
+                Điểm Đến Nổi Bật
             </h2>
 
             <div style={{...styles.productList, gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)"}}>
