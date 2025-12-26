@@ -1,9 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react"; // Thêm useEffect
 import { useNavigate, Link } from "react-router-dom";
-// import axios from "axios"; // Đã thay thế bằng axiosClient
 import axiosClient from "../api/config"; 
+import emailjs from '@emailjs/browser'; // Import thư viện
 
-// 🎨 CÁC ĐỊNH NGHĨA STYLE (Giữ nguyên)
 const ROYAL_COLOR = "#f3c300";
 const DARK_BG = "#0f172a";
 const LIGHT_BG = "#f0f2f5"; 
@@ -81,8 +80,30 @@ function Register() {
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
 
-    // 💡 Endpoint ngắn gọn
+    // Khởi tạo EmailJS ngay khi Component load
+    useEffect(() => {
+        emailjs.init("seajRlYP6YCpKbOZQ");
+    }, []);
+
     const REGISTER_ENDPOINT = "/auth/register";
+
+    // Hàm gửi email chào mừng
+    const sendWelcomeEmail = (targetEmail, targetName) => {
+        const templateParams = {
+            user_name: targetName,
+            user_email: targetEmail, 
+            message: "Chào mừng bạn đã gia nhập hệ thống Luxury Hotel!",
+            join_date: new Date().toLocaleDateString('vi-VN')
+        };
+
+        emailjs.send(
+            'service_nl2yns6', 
+            'template_a41466', // Sử dụng ID template 'Welcome' từ ảnh của bạn
+            templateParams
+        )
+        .then((res) => console.log("Email sent successfully!", res))
+        .catch((err) => console.error("Email failed to send:", err));
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -101,18 +122,17 @@ function Register() {
         setLoading(true);
 
         try {
-            // Sử dụng axiosClient
             const response = await axiosClient.post(REGISTER_ENDPOINT, { username, password, email });
 
-            // 💾 Lưu thông tin xác thực vào Local Storage
             localStorage.setItem('token', response.data.token);
             localStorage.setItem('userId', response.data.userId);
             localStorage.setItem('username', response.data.username);
 
-            // 📢 Kích hoạt sự kiện để đồng bộ trạng thái đăng nhập toàn trang
+            // Gửi email chào mừng
+            sendWelcomeEmail(email, username);
+
             window.dispatchEvent(new Event('auth-change'));
-            
-            alert("Đăng ký thành công! Bạn đã được đăng nhập.");
+            alert("Đăng ký thành công! Vui lòng kiểm tra email chào mừng.");
             navigate('/'); 
 
         } catch (err) {
@@ -127,87 +147,27 @@ function Register() {
         <div style={styles.pageContainer}>
             <div style={styles.formContainer}>
                 <h2 style={styles.heading}>ĐĂNG KÝ TÀI KHOẢN MỚI</h2>
-                
                 <form onSubmit={handleSubmit}>
                     <div style={styles.formGroup}>
-                        <label style={{ color: TEXT_COLOR, display: 'block', marginBottom: '5px' }}>
-                            Tên đăng nhập
-                        </label>
-                        <input
-                            type="text"
-                            value={username}
-                            onChange={(e) => setUsername(e.target.value)}
-                            placeholder="Tên đăng nhập (Username)"
-                            style={styles.inputStyle}
-                            required
-                            disabled={loading}
-                        />
+                        <label style={{ color: TEXT_COLOR, display: 'block', marginBottom: '5px' }}>Tên đăng nhập</label>
+                        <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Tên đăng nhập" style={styles.inputStyle} required disabled={loading} />
                     </div>
-                    
                     <div style={styles.formGroup}>
-                        <label style={{ color: TEXT_COLOR, display: 'block', marginBottom: '5px' }}>
-                            Email
-                        </label>
-                        <input
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            placeholder="Địa chỉ Email"
-                            style={styles.inputStyle}
-                            required
-                            disabled={loading}
-                        />
+                        <label style={{ color: TEXT_COLOR, display: 'block', marginBottom: '5px' }}>Email</label>
+                        <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Địa chỉ Email" style={styles.inputStyle} required disabled={loading} />
                     </div>
-
                     <div style={styles.formGroup}>
-                        <label style={{ color: TEXT_COLOR, display: 'block', marginBottom: '5px' }}>
-                            Mật khẩu
-                        </label>
-                        <input
-                            type="password"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="Nhập mật khẩu"
-                            style={styles.inputStyle}
-                            required
-                            disabled={loading}
-                        />
+                        <label style={{ color: TEXT_COLOR, display: 'block', marginBottom: '5px' }}>Mật khẩu</label>
+                        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Nhập mật khẩu" style={styles.inputStyle} required disabled={loading} />
                     </div>
-                    
                     <div style={styles.formGroup}>
-                        <label style={{ color: TEXT_COLOR, display: 'block', marginBottom: '5px' }}>
-                            Xác nhận mật khẩu
-                        </label>
-                        <input
-                            type="password"
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            placeholder="Nhập lại mật khẩu"
-                            style={styles.inputStyle}
-                            required
-                            disabled={loading}
-                        />
+                        <label style={{ color: TEXT_COLOR, display: 'block', marginBottom: '5px' }}>Xác nhận mật khẩu</label>
+                        <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Nhập lại mật khẩu" style={styles.inputStyle} required disabled={loading} />
                     </div>
-                    
                     {error && <p style={styles.errorText}>{error}</p>}
-
-                    <button
-                        type="submit"
-                        style={styles.buttonStyle}
-                        disabled={loading}
-                        onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#d6ad00'}
-                        onMouseOut={(e) => e.currentTarget.style.backgroundColor = ROYAL_COLOR}
-                    >
-                        {loading ? 'Đang xử lý...' : 'ĐĂNG KÝ'}
-                    </button>
+                    <button type="submit" style={styles.buttonStyle} disabled={loading}>{loading ? 'Đang xử lý...' : 'ĐĂNG KÝ'}</button>
                 </form>
-
-                <p style={styles.linkText}>
-                    Đã có tài khoản?{' '}
-                    <Link to="/login" style={{ color: ROYAL_COLOR, textDecoration: 'none', fontWeight: 'bold' }}>
-                        Đăng nhập ngay
-                    </Link>
-                </p>
+                <p style={styles.linkText}>Đã có tài khoản? <Link to="/login" style={{ color: ROYAL_COLOR, textDecoration: 'none', fontWeight: 'bold' }}>Đăng nhập ngay</Link></p>
             </div>
         </div>
     );
