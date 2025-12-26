@@ -13,6 +13,7 @@ import Cart from './pages/Cart';
 import UserBookings from './pages/UserBookings';
 import AboutHistory from './pages/AboutHistory';
 import Testimonial from './pages/Testimonial';
+import MagazinePage from './pages/MagazinePage.js';
 
 // --- ADMIN COMPONENTS ---
 import AdminLogin from './admin/AdminLogin';
@@ -25,6 +26,7 @@ import AdminUserManagement from './admin/AdminUserManagement';
 import RoomManager from './admin/RoomManager';
 import FacilitiesManager from './admin/FacilitiesManager';
 import AdminReview from './admin/AdminReview';
+
 
 // =========================================================
 // 1. ADMIN LAYOUT WRAPPER
@@ -86,6 +88,7 @@ function App() {
             <Route path="/cart" element={<Cart />} />
             <Route path="/bookings" element={<UserBookings />} />
             <Route path="/about" element={<AboutHistory />} />
+            <Route path="/welcome" element={<MagazinePage />} />
         </Route>
 
         {/* ============ ADMIN ROUTES ============ */}
