@@ -3,12 +3,12 @@ import { useNavigate, Link } from "react-router-dom";
 import axiosClient from "../api/config"; 
 import emailjs from '@emailjs/browser'; 
 
-// 🎨 LUXURY THEME COLORS
-const ROYAL_COLOR = "#f3c300";
-const DARK_BG = "#0f172a";
+// 🎨 CẬP NHẬT ĐỊNH NGHĨA STYLE MÀU XANH
+const ROYAL_COLOR = "#f3c300"; // Màu vàng nhấn
+const DARK_BLUE_BG = "#2b50d8"; // Màu xanh dương chủ đạo (khớp với ảnh bạn gửi)
 const LIGHT_BG = "#f0f2f5"; 
-const INPUT_BG = "#1e293b";
-const TEXT_COLOR = "#ccc";
+const INPUT_LIGHT_BG = "#e8f0fe"; // Màu nền input xanh nhạt khi focus
+const TEXT_WHITE = "#ffffff";
 
 const styles = {
     pageContainer: {
@@ -23,9 +23,9 @@ const styles = {
         width: '100%',
         maxWidth: '450px',
         padding: '40px',
-        backgroundColor: DARK_BG,
+        backgroundColor: DARK_BLUE_BG, // 🔵 Thay đổi từ DARK_BG sang xanh dương
         borderRadius: '12px',
-        boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+        boxShadow: '0 10px 30px rgba(0,0,0,0.2)',
         textAlign: 'center',
     },
     heading: {
@@ -41,7 +41,7 @@ const styles = {
         textAlign: 'left',
     },
     label: {
-        color: TEXT_COLOR,
+        color: TEXT_WHITE, // ⚪ Chuyển nhãn sang màu trắng để nổi bật trên nền xanh
         display: 'block',
         marginBottom: '8px',
         fontSize: '0.85rem',
@@ -51,9 +51,9 @@ const styles = {
         width: '100%',
         padding: '12px 15px',
         borderRadius: '8px',
-        border: '1px solid #334155',
-        backgroundColor: INPUT_BG,
-        color: '#fff',
+        border: 'none', // Bỏ viền để trông hiện đại hơn
+        backgroundColor: "rgba(255, 255, 255, 0.9)", // ⚪ Nền trắng mờ cho input
+        color: "#333", // Chữ trong input màu tối để dễ đọc
         fontSize: '1rem',
         boxSizing: 'border-box',
         outline: 'none',
@@ -62,26 +62,26 @@ const styles = {
         width: '100%',
         padding: '14px',
         backgroundColor: ROYAL_COLOR,
-        color: DARK_BG,
+        color: "#000",
         border: 'none',
         borderRadius: '8px',
         fontWeight: '800',
         cursor: 'pointer',
         fontSize: '1rem',
-        // ✅ FIX CSS WARNING: Tách biệt hoàn toàn marginTop và margin shorthand
         marginTop: '15px',
         marginLeft: '0px',
         marginRight: '0px',
         marginBottom: '0px',
         transition: 'all 0.3s ease',
+        boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
     },
     linkText: {
         marginTop: '25px',
-        color: TEXT_COLOR,
+        color: TEXT_WHITE, // ⚪ Link màu trắng
         fontSize: '0.9rem'
     },
     errorText: {
-        color: '#f87171', 
+        color: '#ffdad6', // Màu đỏ nhạt để dễ đọc trên nền xanh
         marginTop: '15px',
         fontSize: '0.9rem'
     }
